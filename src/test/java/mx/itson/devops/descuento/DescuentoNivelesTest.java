@@ -38,20 +38,30 @@ class DescuentoNivelesTest {
 
     @Test
     void diezPorCientoJustoAntesDelSegundoNivel() {
-        // TODO(alumno): unidades = 499 debe seguir dando 10 %.
-        // Sigue el patron Arrange / Act / Assert de las pruebas de arriba.
+        // Arrange
+        int unidades = 499;
+        // Act
+        int obtenido = descuento.porcentaje(unidades);
+        // Assert
+        assertEquals(10, obtenido);
     }
 
     @Test
     void quincePorCientoEnElSegundoNivel() {
-        // TODO(alumno): unidades = 500 debe dar 15 %.
-        // Sigue el patron Arrange / Act / Assert de las pruebas de arriba.
+        // Arrange
+        int unidades = 500;
+        // Act
+        int obtenido = descuento.porcentaje(unidades);
+        // Assert
+        assertEquals(15, obtenido);
     }
 
     @Test
     void precioUnitarioInvalidoLanzaExcepcion() {
-        // TODO(alumno): descuento.totalCentavos(0L, 10) debe lanzar
-        // IllegalArgumentException. Usa assertThrows (revisa DescuentoSmokeTest
-        // de la Semana 04 si necesitas recordar la sintaxis).
+        //Arrange
+        long precioUnitarioCentavos = 0L;
+        int unidades = 10;
+        //Act y Assert
+        assertThrows(IllegalArgumentException.class, () -> descuento.totalCentavos(precioUnitarioCentavos, unidades));
     }
 }
