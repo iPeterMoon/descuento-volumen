@@ -9,5 +9,5 @@ RUN mvn -B package
 FROM public.ecr.aws/lambda/java:21
 ARG APP_VERSION=local
 ENV APP_VERSION=${APP_VERSION}
-COPY --from=build /src/target/classses ${LAMBDA_TASK_ROOT}
+COPY --from=build /src/target/classes ${LAMBDA_TASK_ROOT}
 CMD [ "mx.itson.devops.descuento.Handler::handleRequest" ]
