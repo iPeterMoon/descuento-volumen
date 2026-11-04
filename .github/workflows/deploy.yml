@@ -7,19 +7,25 @@ permissions: { id-token: write, contents: read }
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-2
+      IMAGE: 667195563260.dkr.ecr.us-east-2.amazonaws.com/descuento-volumen:${{ github.sha }}
     steps:
+    - uses: actions/checkout@v4
     - uses: aws-actions/configure-aws-credentials@v6
       with:
         role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-        aws-region: us-east-2
+        aws-region: ${{ env.AWS_REGION }}
     - uses: aws-actions/amazon-ecr-login@v2
     - run: |
         docker buildx build --platform linux/amd64 --provenance=false \
-          --build-arg APP_VERSION=${GITHUB_SHA::7} --load -t $IMAGE .
+          --build-arg APP_VERSION=${GITHUB_SHA::7} --load -t "$IMAGE" .
         docker push $IMAGE
     - run: |
-        aws lambda update-function-code --function-name descuento-docker --image-uri $IMAGE
+        aws lambda update-function-code --function-name descuento-docker --image-uri "$IMAGE"
         aws lambda wait function-updated --function-name descuento-docker
     - run: |
-        aws lambda invoke ... --payload '{"unidades":150,"precioCentavos":2500}' r.json
+        aws lambda invoke --function-name descuento-docker \
+          --cli-binary-format raw-in-base64-out \
+          --payload '{"unidades":150,"precioCentavos":2500}' r.json
         jq -e '.porcentaje == 10' r.json
