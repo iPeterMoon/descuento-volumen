@@ -1,31 +1,85 @@
-name: deploy
+name: Deploy a Lambda
 
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
 
-on: { push: { branches: [ main ] } }
-permissions: { id-token: write, contents: read }
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REPOSITORY: descuento-volumen
+  FUNCTION_NAME: descuento-docker
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      AWS_REGION: us-east-2
-      IMAGE: 667195563260.dkr.ecr.us-east-2.amazonaws.com/descuento-volumen:${{ github.sha }}
     steps:
-    - uses: actions/checkout@v4
-    - uses: aws-actions/configure-aws-credentials@v6
-      with:
-        role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-        aws-region: ${{ env.AWS_REGION }}
-    - uses: aws-actions/amazon-ecr-login@v2
-    - run: |
-        docker buildx build --platform linux/amd64 --provenance=false \
-          --build-arg APP_VERSION=${GITHUB_SHA::7} --load -t "$IMAGE" .
-        docker push $IMAGE
-    - run: |
-        aws lambda update-function-code --function-name descuento-docker --image-uri "$IMAGE"
-        aws lambda wait function-updated --function-name descuento-docker
-    - run: |
-        aws lambda invoke --function-name descuento-docker \
-          --cli-binary-format raw-in-base64-out \
-          --payload '{"unidades":150,"precioCentavos":2500}' r.json
-        jq -e '.porcentaje == 10' r.json
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Credenciales de AWS (OIDC, sin llaves)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login a Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Definir versión e imagen
+        run: |
+          VERSION="${GITHUB_SHA::7}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "IMAGE=${{ steps.ecr.outputs.registry }}/${ECR_REPOSITORY}:${VERSION}" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build (corre mvn package con pruebas) y push a ECR
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=false \
+            --build-arg APP_VERSION="$VERSION" \
+            --load \
+            -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "Imagen publicada: $IMAGE"
+
+      - name: ¿Existe la función?
+        id: check
+        run: |
+          if aws lambda get-function --function-name "$FUNCTION_NAME" > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::La función $FUNCTION_NAME no existe. Créala en la consola desde la imagen $IMAGE (Container image, x86_64, 512 MB, 10 s) y luego haz Re-run jobs."
+          fi
+
+      - name: Actualizar la función
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          aws lambda update-function-code \
+            --function-name "$FUNCTION_NAME" \
+            --image-uri "$IMAGE" > /dev/null
+          aws lambda wait function-updated --function-name "$FUNCTION_NAME"
+          echo "Función actualizada a $VERSION"
+
+      - name: Smoke test
+        if: steps.check.outputs.exists == 'true'
+        run: |
+          aws lambda invoke \
+            --function-name "$FUNCTION_NAME" \
+            --cli-binary-format raw-in-base64-out \
+            --payload '{"unidades":150,"precioCentavos":2500}' \
+            respuesta.json > /dev/null
+          echo "Respuesta:"; cat respuesta.json; echo
+          jq -e '.porcentaje == 10' respuesta.json
+          jq -e '.totalCentavos == 337500' respuesta.json
+          jq -e --arg v "$VERSION" '.version == $v' respuesta.json
+          echo "Smoke test OK: versión $VERSION en producción"
