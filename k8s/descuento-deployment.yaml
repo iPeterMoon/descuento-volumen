@@ -11,7 +11,7 @@ metadata:
     io.kompose.service: descuento
   name: descuento
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       io.kompose.service: descuento
@@ -29,7 +29,7 @@ spec:
       containers:
         - env:
             - name: APP_VERSION
-              value: k8s-local
+              value: k8s-v2
           image: descuento-volumen:1.0.0
           imagePullPolicy: IfNotPresent
           name: descuento
