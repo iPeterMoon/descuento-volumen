@@ -83,3 +83,25 @@ jobs:
           jq -e '.totalCentavos == 337500' respuesta.json
           jq -e --arg v "$VERSION" '.version == $v' respuesta.json
           echo "Smoke test OK: versión $VERSION en producción"
+
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Credenciales de AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configuracion de la funcion
+        run: aws lambda get-function-configuration --function-name "$FUNCTION_NAME"
+
+      - name: Imagen desplegada
+        run: |
+          IMAGE_URI=$(aws lambda get-function-configuration --function-name "$FUNCTION_NAME" --query Code.ImageUri --output text)
+          echo "ImageUri=$IMAGE_URI"
+          docker pull "$IMAGE_URI"
+          docker image inspect "$IMAGE_URI" --format 'Entrypoint={{json .Config.Entrypoint}} Cmd={{json .Config.Cmd}} Arch={{.Architecture}} WorkingDir={{json .Config.WorkingDir}}'
+
+      - name: Logs de CloudWatch
+        run: aws logs tail "/aws/lambda/$FUNCTION_NAME" --since 1d 2>&1 || true
