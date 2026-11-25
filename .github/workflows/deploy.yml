@@ -61,21 +61,13 @@ jobs:
             echo "::warning::La función $FUNCTION_NAME no existe. Créala en la consola desde la imagen $IMAGE (Container image, x86_64, 512 MB, 10 s) y luego haz Re-run jobs."
           fi
 
-      - name: Alinear arquitectura de la función (x86_64)
-        if: steps.check.outputs.exists == 'true'
-        run: |
-          aws lambda update-function-configuration \
-            --function-name "$FUNCTION_NAME" \
-            --architectures x86_64 > /dev/null
-          aws lambda wait function-updated --function-name "$FUNCTION_NAME"
-          echo "Arquitectura de $FUNCTION_NAME alineada con la imagen (x86_64)"
-
       - name: Actualizar la función
         if: steps.check.outputs.exists == 'true'
         run: |
           aws lambda update-function-code \
             --function-name "$FUNCTION_NAME" \
-            --image-uri "$IMAGE" > /dev/null
+            --image-uri "$IMAGE" \
+            --architectures x86_64 > /dev/null
           aws lambda wait function-updated --function-name "$FUNCTION_NAME"
           echo "Función actualizada a $VERSION"
 
