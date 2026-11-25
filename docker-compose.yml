@@ -1,0 +1,17 @@
+# descuento-volumen · Unidad 3 · Semana 3
+# Va en la raíz de su repo descuento-volumen, junto al Dockerfile de la Semana 07.
+# La imagen base public.ecr.aws/lambda/java:21 trae el Runtime Interface Emulator:
+# el contenedor escucha en el puerto 8080 y recibe invocaciones por HTTP.
+services:
+  descuento:
+    build: .
+    image: descuento-volumen:1.0.0
+    ports:
+      - "9000:8080"
+    environment:
+      APP_VERSION: k8s-local
+    labels:
+      # Las usa Kompose para generar los manifiestos (para Docker son solo etiquetas).
+      kompose.service.type: nodeport
+      kompose.image-pull-policy: IfNotPresent
+      kompose.service.healthcheck.readiness.tcp_port: "8080"
